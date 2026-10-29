@@ -7,14 +7,21 @@
 <label>Private XToys Webhook ID<input id="webhook" type="password" autocomplete="off" placeholder="Enter your own private webhook ID"></label>
 <div class="buttons"><button id="connect" class="primary">Connect</button><button id="disconnect" class="secondary">Disconnect</button></div>
 <p class="hint">Only the toy owner needs to connect. Your webhook ID stays in this local menu and is never sent to the server or partner.</p></section>
+<section class="card"><h2>TRUSTED PARTNERS</h2><p class="hint">Add a nearby player by server ID. Both players must confirm the first partnership; future control requests are automatic.</p>
+<div class="buttons"><input id="trustedId" inputmode="numeric" placeholder="Nearby player server ID"><button id="addTrusted" class="primary">Add by ID</button></div>
+<div class="buttons"><button id="refreshNearby" class="secondary">Refresh nearby players</button></div>
+<div id="nearbyList" class="player-list"><p class="hint">Open the menu or refresh to find players within 10 metres.</p></div>
+<h3>Your trusted partners</h3><div id="trustedList" class="player-list"><p class="hint">No trusted partners yet.</p></div>
+<div id="trustedInviteButtons" class="buttons hidden"><button id="acceptTrusted" class="primary">Confirm partnership</button><button id="declineTrusted" class="danger">Decline</button></div>
+</section>
 <section class="card"><h2>PAIRING</h2><b id="pairStatus">Not paired</b><p id="partner" class="hint">Invite another player by server ID.</p>
 <div class="buttons"><input id="playerId" inputmode="numeric" placeholder="Player server ID"><button id="invite" class="primary">Invite</button></div>
 <div id="inviteButtons" class="buttons hidden"><button id="accept" class="primary">Accept invite</button><button id="decline" class="danger">Decline</button></div>
 <div id="approvalButtons" class="buttons hidden"><button id="approve" class="primary">Approve control</button><button id="deny" class="danger">Decline</button></div></section>
-<section class="card"><h2>PARTNER CONTROL</h2><p class="hint">Request control. Your partner must approve before commands are enabled.</p><button id="request" class="primary wide">Request control</button>
+<section class="card"><h2>PARTNER CONTROL</h2><p class="hint">Trusted partners are granted control automatically. Other partners must be approved.</p><button id="request" class="primary wide">Request control</button>
 <div id="controls" class="hidden"><label>Intensity <output id="levelOut">20%</output><input id="level" type="range" min="0" max="100" value="20"></label>
 <label>Duration<select id="duration"><option value="1">1 second</option><option value="2" selected>2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
 <button id="send" class="primary wide">Send command</button></div></section>
 <section class="safety"><b>Consent & safety</b><p>Either player can stop or revoke the session at any time.</p><div class="buttons"><button id="stop" class="danger">EMERGENCY STOP</button><button id="revoke" class="secondary">Revoke & unpair</button></div><small>Also available: /xtoysstop</small></section>
-<footer>Only pair with someone who explicitly agrees. Start with low intensity and short durations.</footer>
+<footer>Only add people you trust. Either player can remove a trusted partnership or stop control.</footer>
 </section></main><script src="app.js"></script></body></html>
