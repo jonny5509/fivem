@@ -1,6 +1,6 @@
 # xToys Multiplayer (Standalone FiveM)
 
-A standalone, consent-first pairing resource. No ESX, QBCore, database, or framework dependency.
+A standalone, consent-first xToys multiplayer resource. No ESX, QBCore, framework, or external database dependency.
 
 ## Install
 1. Put this folder in your server's resources directory.
@@ -17,23 +17,32 @@ XToys documents the WebSocket endpoint as `wss://webhook.xtoys.app/<webhookid>`.
 
 The trigger action names are configurable in config.lua. The actual toy behavior must be defined in the XToys Script.
 
-This starter uses private webhooks. XToys shared webhooks require an Authorization Bearer header; the NUI browser WebSocket API cannot attach custom handshake headers. Do not paste shared tokens into the server resource. Use a private webhook unless you have a trusted local bridge that handles shared-webhook authentication.
+This starter uses private webhooks. XToys shared webhooks require an Authorization Bearer header; the NUI browser WebSocket API cannot attach custom handshake headers. Use a private webhook unless a trusted local bridge handles shared-webhook authentication.
 
-## Consent and permissions
-- Either player can invite the other by server ID.
-- The recipient must accept before pairing.
-- Either paired player can request control.
-- The toy owner must approve each control request.
-- Only the approved controller can send commands; the server clamps intensity to 0-100 and duration to 1-10 seconds.
-- Either player can emergency-stop or revoke pairing.
-- Disconnecting either player clears the pairing and active control.
-- Only the toy owner needs an XToys connection; the other player only needs to be paired and approved.
+## Trusted partners
+- The menu lists nearby players within `Config.NearbyDistanceMeters` (10 metres by default), showing their in-game name, server ID, and distance.
+- You can add a nearby player using the list or by entering their server ID. The server checks that they are actually within range.
+- The recipient must confirm the first trusted-partner invitation. Both players' consent is required.
+- Confirmed trusted partnerships are saved using the players' FiveM `license:` identifiers in server resource KVP storage, so they survive disconnects and server/resource restarts.
+- Online trusted partners have a **Control** action in the list. It starts a control session without another approval prompt, provided neither player is paired with someone else.
+- Either player can remove the trusted partnership. Removing it also stops an active session between those players.
+- Offline trusted partners remain listed and can be removed.
+
+## Standard pairing and control
+- Either player can invite another by server ID; the recipient must accept.
+- Non-trusted partners must approve every control request.
+- Trusted partners are granted control automatically after the first mutual confirmation.
+- Only one control direction is active at a time.
+- The server clamps intensity to 0-100 and duration to 1-10 seconds.
+- Either paired player can emergency-stop or revoke the active pairing.
+- Disconnecting either player clears the active pairing and stops the session.
+- Only the toy owner needs an XToys connection; the other player only needs to be paired and authorized.
 
 ## ERP integration
-An ERP adapter is not enabled because the exact ERP resource/API has not yet been identified. Once you know its resource name and documented client/server events or exports, an allow-listed adapter can be added without guessing event names.
+No ERP integration is included. This resource is focused on xToys only.
 
 ## Testing
-Test on a private server with two consenting test players. First verify invitations, acceptance, request approval/decline, revoke, emergency stop, and disconnect cleanup. Then test a low-intensity, short-duration XToys action. Ensure the XToys Script has a stop action wired to the `stop` webhook trigger.
+Test on a private server with two consenting test players. Verify nearby detection, trusted invitation and acceptance, persistence after reconnect/restart, trusted control, removal, ordinary pairing, control approval, emergency stop, and disconnect cleanup. Then test a low-intensity, short-duration XToys action. Ensure the XToys Script has a stop action wired to the `stop` webhook trigger.
 
 ## Notes
-This is a starter resource and has not been runtime-tested against your server's artifact build or your specific XToys Script. The server authorizes pairing and commands; it cannot independently confirm physical toy connectivity. Credentials are held in NUI memory only and must be re-entered after a resource/UI restart.
+This resource has not been runtime-tested against your server's artifact build or your specific XToys Script. The server authorizes pairing and commands; it cannot independently confirm physical toy connectivity. Webhook credentials are held in NUI memory only and must be re-entered after a resource/UI restart.
