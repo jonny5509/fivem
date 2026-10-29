@@ -1,3 +1,10 @@
+local debugClients = {}
+local function debugLog(src, message)
+    if Config.Debug == true or debugClients[src] == true then
+        print(('[xToys:SERVER:DEBUG] [%s] %s'):format(tostring(src or 'server'), tostring(message)))
+    end
+end
+
 local paired, pendingInvites, pendingControl, activeController = {}, {}, {}, {}
 local pendingTrustedInvites, trusted = {}, {}
 
@@ -110,10 +117,20 @@ local function grantControl(controller, owner)
     state(owner); state(controller)
 end
 
-RegisterNetEvent('xtoys:requestState', function() state(source) end)
+RegisterNetEvent('xtoys:debugToggle', function(enabled)
+    local src = source
+    debugClients[src] = enabled == true or nil
+    debugLog(src, enabled == true and 'Client enabled server-side diagnostic logging.' or 'Client disabled server-side diagnostic logging.')
+end)
+
+RegisterNetEvent('xtoys:requestState', function()
+    debugLog(source, 'Requested pairing/control state.')
+    state(source)
+end)
 
 RegisterNetEvent('xtoys:getNearby', function()
     local src = source
+    debugLog(src, 'Requested nearby-player scan.')
     local ped = GetPlayerPed(src)
     if ped == 0 then return end
     local origin = GetEntityCoords(ped)
@@ -136,6 +153,7 @@ end)
 
 RegisterNetEvent('xtoys:invite', function(target)
     local src = source
+    debugLog(src, ('Pairing invitation requested for server ID %s.'):format(tostring(target)))
     target = tonumber(target)
     if not target or target == src or not GetPlayerName(target) then return msg(src, 'Invalid player server ID.', 'error') end
     if partnerOf(src) or partnerOf(target) then return msg(src, 'One of you is already paired.', 'error') end
@@ -156,6 +174,7 @@ end)
 
 RegisterNetEvent('xtoys:acceptInvite', function()
     local src = source
+    debugLog(src, 'Accepted pairing invitation.')
     local inv = pendingInvites[src]
     if not inv or not GetPlayerName(inv.from) then pendingInvites[src] = nil; return msg(src, 'Invitation expired.', 'error') end
     local other = inv.from
@@ -179,6 +198,7 @@ end)
 
 RegisterNetEvent('xtoys:trustedInvite', function(target)
     local src = source
+    debugLog(src, ('Trusted-partner invitation requested for server ID %s.'):format(tostring(target)))
     target = tonumber(target)
     if not target or target == src or not GetPlayerName(target) then return msg(src, 'Invalid player server ID.', 'error') end
     local a, b = identifier(src), identifier(target)
@@ -204,6 +224,7 @@ end)
 
 RegisterNetEvent('xtoys:acceptTrustedInvite', function()
     local src = source
+    debugLog(src, 'Accepted trusted-partner invitation.')
     local inv = pendingTrustedInvites[src]
     if not inv or not GetPlayerName(inv.from) then pendingTrustedInvites[src] = nil; return msg(src, 'Trusted invitation expired.', 'error') end
     local other = inv.from
@@ -252,6 +273,7 @@ end)
 
 RegisterNetEvent('xtoys:requestControl', function()
     local src = source
+    debugLog(src, 'Requested remote control.')
     local target = partnerOf(src)
     if not target then return msg(src, 'Pair with a player first.', 'error') end
     if activeController[src] == target then return msg(src, 'You already have control.') end
@@ -273,6 +295,7 @@ end)
 
 RegisterNetEvent('xtoys:startTrustedControl', function(target)
     local src = source
+    debugLog(src, ('Requested trusted control for server ID %s.'):format(tostring(target)))
     target = tonumber(target)
     if not target or not GetPlayerName(target) or not isTrusted(src, target) then return msg(src, 'That player is not an online trusted partner.', 'error') end
     if partnerOf(src) == target then
@@ -301,6 +324,7 @@ end)
 
 RegisterNetEvent('xtoys:controlCommand', function(intensity, duration)
     local src = source
+    debugLog(src, ('Control command submitted (intensity %s, duration %s).'):format(tostring(intensity), tostring(duration)))
     local target = partnerOf(src)
     if not target or activeController[src] ~= target then return msg(src, 'You do not have approved control.', 'error') end
     intensity, duration = tonumber(intensity), tonumber(duration)
@@ -312,12 +336,14 @@ end)
 
 RegisterNetEvent('xtoys:revoke', function()
     local src = source
+    debugLog(src, 'Requested pairing revocation.')
     local p = partnerOf(src)
     if p then unpair(src, p, 'Pairing revoked. Remote control stopped.') end
 end)
 
 RegisterNetEvent('xtoys:emergencyStop', function()
     local src = source
+    debugLog(src, 'Triggered emergency stop.')
     local p = partnerOf(src)
     if p then
         activeController[src], activeController[p] = nil, nil
@@ -334,6 +360,8 @@ end)
 
 AddEventHandler('playerDropped', function()
     local src = source
+    debugLog(src, 'Player disconnected; cleaning up sessions and invitations.')
+    debugClients[src] = nil
     local p = partnerOf(src)
     if p then unpair(src, p, 'Your partner disconnected; the session was stopped.') end
     for target, inv in pairs(pendingInvites) do
