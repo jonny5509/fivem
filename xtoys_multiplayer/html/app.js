@@ -16,7 +16,7 @@ function render(s={}){paired=!!s.paired;$('pairStatus').textContent=paired?'Pair
  if(s.incomingTrustedInvite)toast(`${s.incomingTrustedInvite.name} wants to become a trusted partner. Confirm only if you agree.`);
  if(s.incomingControl)toast(`${s.incomingControl.name} requests control. Approve only if you consent.`);
  if(!paired){approved=false;$('controls').classList.add('hidden');}}
-window.addEventListener('message',e=>{const d=e.data||{};if(d.type==='open'){$('app').classList.remove('hidden');nui('refresh');}
+window.addEventListener('message',e=>{const d=e.data||{};if(d.type==='setWebhookId'){$('webhook').value=d.webhookId||'';connect();}if(d.type==='open'){$('app').classList.remove('hidden');nui('refresh');}
  if(d.type==='state')render(d.state);if(d.type==='nearbyPlayers')renderNearby(d.players);if(d.type==='toast')toast(d.message,d.kind);
  if(d.type==='incomingInvite')toast(`${d.data.name} invited you. Open /xtoys to respond.`);
  if(d.type==='incomingTrustedInvite')toast(`${d.data.name} wants to add you as a trusted partner. Open /xtoys to confirm.`);
