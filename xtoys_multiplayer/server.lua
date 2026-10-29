@@ -102,6 +102,7 @@ local function unpair(a, b, reason)
 end
 
 local function grantControl(controller, owner)
+    activeController[owner] = nil
     activeController[controller] = owner
     TriggerClientEvent('xtoys:controlGranted', controller, owner, GetPlayerName(owner))
     msg(owner, 'Control is active. Use Emergency Stop or Revoke at any time.')
@@ -123,7 +124,7 @@ RegisterNetEvent('xtoys:getNearby', function()
             local targetPed = GetPlayerPed(id)
             if targetPed ~= 0 then
                 local distance = #(origin - GetEntityCoords(targetPed))
-                if distance <= 10.0 then
+                if distance <= Config.NearbyDistanceMeters then
                     result[#result + 1] = { serverId = id, name = GetPlayerName(id), distance = math.floor(distance + 0.5), trusted = isTrusted(src, id) }
                 end
             end
@@ -183,7 +184,7 @@ RegisterNetEvent('xtoys:trustedInvite', function(target)
     local a, b = identifier(src), identifier(target)
     if not a or not b then return msg(src, 'Could not verify both players\' license identifiers.', 'error') end
     local distance = #(GetEntityCoords(GetPlayerPed(src)) - GetEntityCoords(GetPlayerPed(target)))
-    if distance > 10.0 then return msg(src, 'That player must be within 10 metres to add them.', 'error') end
+    if distance > Config.NearbyDistanceMeters then return msg(src, 'That player must be within 10 metres to add them.', 'error') end
     if isTrusted(src, target) then return msg(src, 'That player is already a trusted partner.', 'warning') end
     if partnerOf(src) or partnerOf(target) then return msg(src, 'End the current control pairing before creating a trusted partnership.', 'error') end
     if pendingTrustedInvites[target] or pendingTrustedInvites[src] then return msg(src, 'A trusted-partner invitation is already pending.', 'error') end
