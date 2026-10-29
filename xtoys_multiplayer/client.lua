@@ -1,4 +1,13 @@
+local debugEnabled = Config.Debug == true
+
+local function debugLog(message)
+    if debugEnabled then
+        print(('[xToys:CLIENT:DEBUG] %s'):format(tostring(message)))
+    end
+end
+
 local function notify(message, kind)
+    debugLog(('Notification (%s): %s'):format(tostring(kind or 'info'), tostring(message)))
     SendNUIMessage({ type = 'toast', message = message, kind = kind or 'info' })
 end
 
@@ -24,7 +33,29 @@ local function showCommandHelp()
         color = { 255, 255, 255 },
         args = { '/xtoysstop', 'Immediately send an emergency stop.' }
     })
+    TriggerEvent('chat:addMessage', {
+        color = { 255, 255, 255 },
+        args = { '/xtoysdebug on|off|status', 'Enable/disable diagnostic logging or check its status.' }
+    })
 end
+
+RegisterCommand('xtoysdebug', function(_, args)
+    local setting = (args[1] or 'status'):lower()
+    if setting == 'on' then
+        debugEnabled = true
+        TriggerServerEvent('xtoys:debugToggle', true)
+        print('[xToys:CLIENT:DEBUG] Debug logging enabled. Check this F8 console and the server console.')
+        TriggerEvent('chat:addMessage', { color = { 100, 220, 150 }, args = { 'xToys', 'Debug logging enabled. Check F8 and the server console.' } })
+    elseif setting == 'off' then
+        debugEnabled = false
+        TriggerServerEvent('xtoys:debugToggle', false)
+        TriggerEvent('chat:addMessage', { color = { 255, 180, 90 }, args = { 'xToys', 'Client debug logging disabled.' } })
+    elseif setting == 'status' then
+        TriggerEvent('chat:addMessage', { color = { 167, 139, 250 }, args = { 'xToys', 'Client debug logging: ' .. (debugEnabled and 'ON' or 'OFF') .. '. Use /xtoysdebug on or /xtoysdebug off.' } })
+    else
+        TriggerEvent('chat:addMessage', { color = { 255, 180, 90 }, args = { 'xToys', 'Usage: /xtoysdebug on|off|status' } })
+    end
+end, false)
 
 RegisterCommand('xtoyshelp', function()
     showCommandHelp()
@@ -54,9 +85,11 @@ RegisterNetEvent('onClientResourceStart', function(resource)
         { name = 'webhook_id', help = 'Your private xToys webhook ID' }
     })
     TriggerEvent('chat:addSuggestion', '/xtoysstop', 'Emergency stop the active xToys session')
+    TriggerEvent('chat:addSuggestion', '/xtoysdebug', 'Toggle xToys diagnostic logging', { { name = 'mode', help = 'on, off, or status' } })
 end)
 
 RegisterCommand(Config.OpenCommand, function()
+    debugLog('Opening menu and requesting state/nearby players.')
     showCommandHelp()
     SetNuiFocus(true, true)
     SendNUIMessage({ type = 'open' })
@@ -69,8 +102,8 @@ RegisterCommand(Config.StopCommand, function()
 end, false)
 
 RegisterNetEvent('xtoys:notify', notify)
-RegisterNetEvent('xtoys:state', function(s) SendNUIMessage({ type = 'state', state = s }) end)
-RegisterNetEvent('xtoys:nearbyPlayers', function(players) SendNUIMessage({ type = 'nearbyPlayers', players = players }) end)
+RegisterNetEvent('xtoys:state', function(s) debugLog('Received state update.'); SendNUIMessage({ type = 'state', state = s }) end)
+RegisterNetEvent('xtoys:nearbyPlayers', function(players) debugLog(('Received nearby-player list (%d entries).'):format(type(players) == 'table' and #players or 0)); SendNUIMessage({ type = 'nearbyPlayers', players = players }) end)
 RegisterNetEvent('xtoys:incomingInvite', function(d) SendNUIMessage({ type = 'incomingInvite', data = d }) end)
 RegisterNetEvent('xtoys:incomingTrustedInvite', function(d) SendNUIMessage({ type = 'incomingTrustedInvite', data = d }) end)
 RegisterNetEvent('xtoys:incomingControl', function(d) SendNUIMessage({ type = 'incomingControl', data = d }) end)
@@ -79,10 +112,12 @@ RegisterNetEvent('xtoys:controlGranted', function(ownerId, ownerName)
 end)
 
 RegisterNetEvent('xtoys:receiveControl', function(controllerId, intensity, duration)
+    debugLog(('Control command received from server (controller %s, intensity %s, duration %s).'):format(tostring(controllerId), tostring(intensity), tostring(duration)))
     SendNUIMessage({ type = 'xtoysCommand', action = Config.XToysActions.setIntensity,
         intensity = intensity, duration = duration, controllerId = controllerId })
 end)
 RegisterNetEvent('xtoys:stopLocal', function()
+    debugLog('Emergency/remote stop event received.')
     SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.stop })
 end)
 
