@@ -4,6 +4,9 @@ Config = {
     InviteTimeoutSeconds = 30,
     ControlRequestTimeoutSeconds = 20,
     NearbyDistanceMeters = 10,
+
+    -- Debug logging. Can also be toggled in-game with /xtoysdebug on|off|status.
+    Debug = false,
     MaxIntensity = 100,
     MaxDurationSeconds = 10,
 
