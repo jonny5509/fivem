@@ -6,7 +6,7 @@ A standalone, consent-first xToys multiplayer resource. No ESX, QBCore, framewor
 1. Put this folder in your server's resources directory.
 2. Add `ensure xtoys_multiplayer` to server.cfg.
 3. Restart the resource/server.
-4. Use `/xtoys` in game. Use `/xtoysstop` for an emergency stop.
+4. Use `/xtoys` in game to open the menu and print the command list in chat.\n5. Use `/xtoyshelp` to print the command list again.\n6. Use `/xtoysid YOUR_WEBHOOK_ID` to set your private webhook ID and connect from chat.\n7. Use `/xtoysstop` for an emergency stop.
 
 ## XToys setup
 Each toy owner creates a **Private Webhook** in XToys and enters its ID in their own menu. Only the device owner's local NUI opens the XToys WebSocket; the ID is never sent to the FiveM server or partner.
