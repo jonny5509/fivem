@@ -3,6 +3,7 @@ Config = {
     StopCommand = 'xtoysstop',
     InviteTimeoutSeconds = 30,
     ControlRequestTimeoutSeconds = 20,
+    NearbyDistanceMeters = 10,
     MaxIntensity = 100,
     MaxDurationSeconds = 10,
 
