@@ -38,6 +38,13 @@ This starter uses private webhooks. XToys shared webhooks require an Authorizati
 - Disconnecting either player clears the active pairing and stops the session.
 - Only the toy owner needs an XToys connection; the other player only needs to be paired and authorized.
 
+## Debugging and fault reports
+- Debug logging is off by default. Enable it in-game with `/xtoysdebug on`; this enables client F8 logs and server-console logs for that player's activity.
+- Use `/xtoysdebug status` to check the client setting and `/xtoysdebug off` to disable it.
+- Set `Config.Debug = true` in `config.lua` to enable server debug logging globally.
+- Logs use the prefixes `[xToys:CLIENT:DEBUG]` and `[xToys:SERVER:DEBUG]`. They include useful event/flow details but deliberately do not print webhook IDs.
+- If reporting a fault, send me the exact in-game error/message, the matching F8 and server-console lines, what you were doing immediately before it happened, and whether it happens every time. You can copy the relevant lines; redact player identifiers and any private credentials.
+
 ## ERP integration
 No ERP integration is included. This resource is focused on xToys only.
 
