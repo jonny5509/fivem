@@ -95,6 +95,7 @@ RegisterCommand(Config.OpenCommand, function()
     SendNUIMessage({ type = 'open' })
     TriggerServerEvent('xtoys:requestState')
     TriggerServerEvent('xtoys:getNearby')
+    TriggerServerEvent('xtoys:requestAdvancedState')
 end, false)
 
 RegisterCommand(Config.StopCommand, function()
@@ -123,7 +124,7 @@ end)
 
 RegisterNUICallback('close', function(_, cb) SetNuiFocus(false, false); cb({ ok = true }) end)
 RegisterNUICallback('refresh', function(_, cb)
-    TriggerServerEvent('xtoys:requestState'); TriggerServerEvent('xtoys:getNearby'); cb({ ok = true })
+    TriggerServerEvent('xtoys:requestState'); TriggerServerEvent('xtoys:getNearby'); TriggerServerEvent('xtoys:requestAdvancedState'); cb({ ok = true })
 end)
 RegisterNUICallback('invite', function(d, cb) TriggerServerEvent('xtoys:invite', d.target); cb({ ok = true }) end)
 RegisterNUICallback('acceptInvite', function(_, cb) TriggerServerEvent('xtoys:acceptInvite'); cb({ ok = true }) end)
@@ -145,4 +146,55 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then SetNuiFocus(false, false) end
+end)
+
+
+local selfMode = Config.SelfControl.EnabledByDefault
+local gameplayActive, lastEvent, lastSpeed = false, 0, 0
+local function pulse(intensity,seconds)
+ if not selfMode then return end
+ gameplayActive=true
+ SendNUIMessage({type='xtoysCommand',action=Config.XToysActions.setIntensity,intensity=math.max(0,math.min(Config.MaxIntensity,intensity)),duration=seconds})
+end
+local function stopGameplay()
+ if gameplayActive then SendNUIMessage({type='xtoysStop',action=Config.XToysActions.stop}); gameplayActive=false end
+end
+RegisterNetEvent('xtoys:advancedState',function(data)
+ selfMode=data.controlMode=='self'
+ SendNUIMessage({type='advancedState',state=data})
+ if not selfMode then stopGameplay() end
+end)
+RegisterNUICallback('setControlMode',function(d,cb) TriggerServerEvent('xtoys:setControlMode',d.mode); cb({ok=true}) end)
+RegisterNUICallback('setQiuiEnabled',function(d,cb) TriggerServerEvent('xtoys:setQiuiEnabled',d.enabled==true); cb({ok=true}) end)
+RegisterNUICallback('qiuiAction',function(d,cb) TriggerServerEvent('xtoys:qiuiRequest',d.action); cb({ok=true}) end)
+CreateThread(function()
+ local firing=false
+ while true do
+  Wait(Config.SelfControl.PollMilliseconds)
+  if selfMode then
+   local ped=PlayerPedId()
+   local shooting=IsPedShooting(ped)
+   if shooting then pulse(Config.SelfControl.ContinuousFireIntensity,1)
+   elseif firing then stopGameplay() end
+   firing=shooting
+   local now=GetGameTimer()
+   if Config.SelfControl.EnableFalls and (IsPedFalling(ped) or IsPedRagdoll(ped)) and now-lastEvent>Config.SelfControl.EventCooldownMilliseconds then
+    lastEvent=now; pulse(Config.SelfControl.FallIntensity,1)
+   end
+   if Config.SelfControl.EnableCollisions and IsPedInAnyVehicle(ped,false) then
+    local v=GetVehiclePedIsIn(ped,false); local speed=GetEntitySpeed(v)
+    if lastSpeed-speed>8.0 and now-lastEvent>Config.SelfControl.EventCooldownMilliseconds then lastEvent=now; pulse(Config.SelfControl.CollisionIntensity,1) end
+    lastSpeed=speed
+   else lastSpeed=0 end
+  else firing=false; stopGameplay(); Wait(200) end
+ end
+end)
+AddEventHandler('gameEventTriggered',function(name,args)
+ if not selfMode then return end
+ local ped=PlayerPedId(); local now=GetGameTimer()
+ if name=='CEventNetworkEntityDamage' and args and args[1]==ped and Config.SelfControl.EnableDamage and now-lastEvent>Config.SelfControl.EventCooldownMilliseconds then
+  lastEvent=now; pulse(Config.SelfControl.DamageIntensity,2)
+ elseif name=='CEventShockingExplosion' and Config.SelfControl.EnableExplosions and now-lastEvent>Config.SelfControl.EventCooldownMilliseconds then
+  lastEvent=now; pulse(Config.SelfControl.ExplosionIntensity,2)
+ end
 end)
