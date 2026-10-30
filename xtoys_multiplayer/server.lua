@@ -475,6 +475,7 @@ local function sendSpecialState(src)
   specialPartnerName=rec.specialName,
   specialPartnerOnline=partnerOnline~=nil,
   specialPartnerLastSeen=rec.lastSeen,
+  expiredNotice=rec.expiredNotice==true,
   pendingOffer=rec.offer and {targetName=rec.offer.targetName,accepted=rec.offer.accepted==true,expiresAt=rec.offer.expiresAt} or nil,
   incomingOffers=incoming
  })
@@ -485,7 +486,7 @@ local function notifySpecialOwner(ownerId,text,kind)
 end
 local function expireSpecial(ownerId,rec)
  local oldName=rec.specialName or 'Special Partner'
- rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil
+ rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil; rec.expiredNotice=true
  saveSpecialRecords()
  notifySpecialOwner(ownerId,oldName..' was offline for more than 72 hours. Special Partner permissions expired; control is yours again. You can offer the role to someone else or leave it disabled.','warning')
 end
@@ -520,6 +521,7 @@ RegisterNetEvent('xtoys:specialOffer',function(target)
  if not own or not target or target==src or not GetPlayerName(target) or not isTrusted(src,target) then return msg(src,'Choose an online trusted partner.','error') end
  local targetId=identifier(target); if not targetId then return msg(src,'Could not verify that partner.','error') end
  local rec=specialRecord(own)
+ rec.expiredNotice=false
  if rec.specialId==targetId then return msg(src,'That player is already your Special Partner.','warning') end
  rec.offer={targetId=targetId,targetName=GetPlayerName(target),ownerName=GetPlayerName(src),ownerId=own,accepted=false,expiresAt=os.time()+(Config.SpecialPartner.OfferExpiryHours or 48)*3600}
  saveSpecialRecords()
@@ -559,7 +561,7 @@ RegisterNetEvent('xtoys:specialRevoke',function()
  local src=source; local own=identifier(src); local rec=own and specialRecords[own]
  if not rec then return msg(src,'No Special Partner is assigned.','warning') end
  local old=rec.specialId and findOnline(rec.specialId)
- rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil
+ rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil; rec.expiredNotice=false
  saveSpecialRecords()
  msg(src,'Special Partner access revoked. Control remains with you.')
  if old then msg(old,'The owner revoked your Special Partner access.','warning'); sendSpecialState(old) end
