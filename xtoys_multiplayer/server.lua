@@ -401,7 +401,7 @@ end
 local function sendAdvancedState(src)
  local key=qiuiKvpKey(src)
  if qiuiEnabled[src]==nil and key and GetResourceKvpString(key)=='1' then qiuiEnabled[src]=true end
- TriggerClientEvent('xtoys:advancedState',src,{controlMode=controlModes[src] or 'self',qiuiEnabled=qiuiEnabled[src]==true,qiuiAvailable=Config.QIUI.AdapterResource~='' and GetResourceState(Config.QIUI.AdapterResource)=='started'})
+ TriggerClientEvent('xtoys:advancedState',src,{controlMode=controlModes[src] or 'self',qiuiEnabled=qiuiEnabled[src]==true,qiuiAvailable=Config.QIUI.AdapterVerified==true and Config.QIUI.AdapterResource~='' and GetResourceState(Config.QIUI.AdapterResource)=='started'})
 end
 RegisterNetEvent('xtoys:requestAdvancedState',function() sendAdvancedState(source) end)
 local function stopOwnerControl(owner)
@@ -427,7 +427,7 @@ RegisterNetEvent('xtoys:setQiuiEnabled',function(enabled)
  local src=source
  if enabled==true then
   local adapter=Config.QIUI.AdapterResource
-  if adapter=='' or GetResourceState(adapter)~='started' then
+  if Config.QIUI.AdapterVerified~=true or adapter=='' or GetResourceState(adapter)~='started' then
    qiuiEnabled[src]=nil; sendAdvancedState(src)
    return msg(src,'QIUI unavailable: no configured, running model-specific adapter.', 'error')
   end
@@ -439,6 +439,7 @@ end)
 RegisterNetEvent('xtoys:qiuiRequest',function(action)
  local src=source
  if qiuiEnabled[src]~=true then return msg(src,'QIUI integration is disabled.','error') end
+ if Config.QIUI.AdapterVerified~=true then return msg(src,'Cellmate 2 adapter has not been verified. No device command was sent.','error') end
  if action~='lock' and action~='unlock' then return end
  -- Deliberately no guessed device protocol: a verified model adapter must be wired here.
  msg(src,'No verified QIUI device adapter is implemented. No device command was sent.','error')
