@@ -1,3 +1,11 @@
+# xToys Self Control
+
+This folder is the FiveM-resource implementation: it can automatically detect local gameplay events, but FiveM servers must distribute/start it as a resource.
+
+**Want to run locally without any server-side installation?** Use the separate [Windows Local Companion](../xtoys_self_control_companion/README.md). It connects directly to your private XToys webhook and uses manual global hotkeys. It does not inspect or inject into FiveM, and cannot automatically detect in-game events.
+
+---
+
 # xToys Self Control (client-only FiveM resource)
 
 A small standalone resource that connects one player's private XToys webhook and uses that player's own GTA/FiveM gameplay events to trigger their own toy.
