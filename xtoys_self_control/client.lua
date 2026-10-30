@@ -10,7 +10,6 @@ local fireBurst = false
 local wasMelee = false
 local wasFalling = false
 local wasRagdoll = false
-local lastVehicleCollisionAt = 0
 
 local function log(message)
     if debugEnabled then
@@ -49,12 +48,24 @@ local function pulse(intensity, duration, source)
     })
 end
 
-local function stopToy()
-    if gameplayActive then
+local function stopToy(force)
+    if gameplayActive or force then
         SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
         gameplayActive = false
         log('Stop sent.')
     end
+end
+
+local function openMenu()
+    SetNuiFocus(true, true)
+    SendNUIMessage({ type = 'open' })
+end
+
+local function emergencyStop()
+    gameplayEnabled = false
+    stopToy(true)
+    SendNUIMessage({ type = 'enabledState', enabled = false })
+    notify('Emergency stop sent. Triggers paused. Re-enable them in the menu or use /xtoysdebug resume.')
 end
 
 local function connectFromCommand(webhookId)
@@ -66,18 +77,14 @@ local function connectFromCommand(webhookId)
     SendNUIMessage({ type = 'connectWebhook', webhookId = webhookId })
 end
 
-RegisterCommand(Config.OpenCommand, function()
-    SetNuiFocus(true, true)
-    SendNUIMessage({ type = 'open' })
-end, false)
+RegisterCommand(Config.OpenCommand, openMenu, false)
+RegisterCommand('+xtoys_menu', openMenu, false)
+RegisterCommand('-xtoys_menu', function() end, false)
+RegisterKeyMapping('+xtoys_menu', 'Open xToys Self Control menu', 'keyboard', 'F7')
 
-RegisterCommand(Config.StopCommand, function()
-    gameplayEnabled = false
-    stopToy()
-    SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
-    notify('Emergency stop sent. Gameplay triggers are paused; use /xtoys to re-enable them.')
-    SendNUIMessage({ type = 'enabledState', enabled = false })
-end, false)
+RegisterCommand(Config.StopCommand, emergencyStop, false)
+RegisterCommand('xtoys_emergency_key', emergencyStop, false)
+RegisterKeyMapping('xtoys_emergency_key', 'xToys emergency stop (pause gameplay triggers)', 'keyboard', 'F8')
 
 RegisterCommand(Config.ConnectCommand, function(_, args)
     connectFromCommand(table.concat(args, ' '))
@@ -108,16 +115,13 @@ end)
 
 RegisterNUICallback('setEnabled', function(data, cb)
     gameplayEnabled = data.enabled == true
-    if not gameplayEnabled then stopToy() end
+    if not gameplayEnabled then stopToy(true) end
     SendNUIMessage({ type = 'enabledState', enabled = gameplayEnabled })
     cb({ ok = true })
 end)
 
 RegisterNUICallback('emergencyStop', function(_, cb)
-    gameplayEnabled = false
-    stopToy()
-    SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
-    SendNUIMessage({ type = 'enabledState', enabled = false })
+    emergencyStop()
     cb({ ok = true })
 end)
 
@@ -167,9 +171,9 @@ CreateThread(function()
                 if Config.SelfControl.EnableFalls then
                     local falling = IsPedFalling(ped)
                     local ragdoll = IsPedRagdoll(ped)
-                    if (falling and not wasFalling) and eventReady('fall') then
+                    if falling and not wasFalling and eventReady('fall') then
                         pulse(Config.SelfControl.FallIntensity, Config.SelfControl.FallDurationSeconds, 'fall')
-                    elseif (ragdoll and not wasRagdoll) and eventReady('ragdoll') then
+                    elseif ragdoll and not wasRagdoll and eventReady('ragdoll') then
                         pulse(Config.SelfControl.FallIntensity, Config.SelfControl.FallDurationSeconds, 'ragdoll')
                     end
                     wasFalling = falling
@@ -182,7 +186,7 @@ CreateThread(function()
                     local speedDrop = lastVehicleSpeed - speed
                     local collided = HasEntityCollidedWithAnything(vehicle)
                     if (speedDrop >= Config.SelfControl.CollisionSpeedDrop
-                        or collided and speed >= Config.SelfControl.MinimumCollisionSpeed)
+                        or (collided and speed >= Config.SelfControl.MinimumCollisionSpeed))
                         and eventReady('vehicle_collision', Config.SelfControl.CollisionCooldownMilliseconds) then
                         pulse(Config.SelfControl.CollisionIntensity, Config.SelfControl.CollisionDurationSeconds, 'vehicle collision')
                     end
@@ -224,7 +228,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
-        stopToy()
+        stopToy(true)
         SetNuiFocus(false, false)
     end
 end)
