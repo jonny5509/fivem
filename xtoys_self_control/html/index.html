@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>xToys Self Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app" class="hidden">
+    <section class="panel">
+        <header>
+            <div><small>CLIENT-ONLY FIVEM RESOURCE</small><h1>xToys <span>Self Control</span></h1></div>
+            <button id="close" class="close" aria-label="Close">×</button>
+        </header>
+        <div id="toast" class="toast hidden"></div>
+        <section class="card">
+            <h2>YOUR XToys CONNECTION</h2>
+            <div class="line"><i id="dot"></i><b id="connection">Not connected</b></div>
+            <label>Private XToys Webhook ID
+                <input id="webhook" type="password" autocomplete="off" placeholder="Enter your private webhook ID">
+            </label>
+            <div class="buttons">
+                <button id="connect" class="primary">Connect</button>
+                <button id="disconnect" class="secondary">Disconnect</button>
+            </div>
+            <p class="hint">Your webhook ID stays in this local NUI session and is never sent to the server.</p>
+        </section>
+        <section class="card">
+            <h2>SELF CONTROL</h2>
+            <p class="hint">Only your own gameplay events can trigger your connected toy. There is no pairing, partner control, or server-side multiplayer logic in this resource.</p>
+            <div class="line"><i id="modeDot" class="online"></i><b id="modeStatus">Self Control enabled</b></div>
+            <label class="toggle"><input id="enabled" type="checkbox" checked> Enable gameplay feedback</label>
+            <p class="hint">Shooting, damage, explosions, vehicle impacts, falls/ragdolls and melee can trigger feedback. Automatic fire refreshes while firing and stops when you stop shooting.</p>
+        </section>
+        <section class="safety">
+            <b>Emergency stop</b>
+            <p>Use this at any time to send an immediate stop command.</p>
+            <div class="buttons"><button id="stop" class="danger wide">EMERGENCY STOP</button></div>
+            <small>Also available with /xtoysstop</small>
+        </section>
+        <footer>Commands: /xtoys · /xtoysconnect YOUR_WEBHOOK_ID · /xtoysstop</footer>
+    </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
