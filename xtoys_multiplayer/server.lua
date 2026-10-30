@@ -84,7 +84,8 @@ local function state(src)
         incomingTrustedInvite = trustedInv and { from = trustedInv.from, name = GetPlayerName(trustedInv.from) } or nil,
         incomingControl = req and { from = req.from, name = GetPlayerName(req.from) } or nil,
         hasControl = p and activeController[p] == src or false,
-        trustedPartners = trustedList(src)
+        trustedPartners = trustedList(src),
+        controlMode = controlModes[src] or 'self'
     })
 end
 
@@ -277,6 +278,12 @@ RegisterNetEvent('xtoys:requestControl', function()
     local target = partnerOf(src)
     if not target then return msg(src, 'Pair with a player first.', 'error') end
     if activeController[src] == target then return msg(src, 'You already have control.') end
+    local mode = controlModes[target] or 'self'
+    if mode == 'self' then return msg(src, 'Your partner is in Self Control mode.', 'warning') end
+    if mode == 'trusted' then
+        if isTrusted(src, target) then return grantControl(src, target) end
+        return msg(src, 'This player only accepts saved trusted partners.', 'error')
+    end
     if isTrusted(src, target) then return grantControl(src, target) end
     if pendingControl[target] then return msg(src, 'A control request is already pending.', 'warning') end
     pendingControl[target] = { from = src }
@@ -298,6 +305,7 @@ RegisterNetEvent('xtoys:startTrustedControl', function(target)
     debugLog(src, ('Requested trusted control for server ID %s.'):format(tostring(target)))
     target = tonumber(target)
     if not target or not GetPlayerName(target) or not isTrusted(src, target) then return msg(src, 'That player is not an online trusted partner.', 'error') end
+    if (controlModes[target] or 'self') ~= 'trusted' then return msg(src, 'Your partner has not selected Trusted Partner mode.', 'error') end
     if partnerOf(src) == target then
         if activeController[src] == target then return msg(src, 'You already have control.') end
         return grantControl(src, target)
@@ -326,7 +334,7 @@ RegisterNetEvent('xtoys:controlCommand', function(intensity, duration)
     local src = source
     debugLog(src, ('Control command submitted (intensity %s, duration %s).'):format(tostring(intensity), tostring(duration)))
     local target = partnerOf(src)
-    if not target or activeController[src] ~= target then return msg(src, 'You do not have approved control.', 'error') end
+    if not target or activeController[src] ~= target or (controlModes[target] or 'self') == 'self' then return msg(src, 'You do not have approved control.', 'error') end
     intensity, duration = tonumber(intensity), tonumber(duration)
     if not intensity or not duration then return end
     intensity = math.floor(math.max(0, math.min(Config.MaxIntensity, intensity)))
@@ -382,4 +390,49 @@ AddEventHandler('playerDropped', function()
             if owner ~= src and GetPlayerName(owner) then msg(owner, 'Control request cancelled because the requester disconnected.', 'warning') end
         end
     end
+end)
+
+
+local controlModes, qiuiEnabled = {}, {}
+local function sendAdvancedState(src)
+ TriggerClientEvent('xtoys:advancedState',src,{controlMode=controlModes[src] or 'self',qiuiEnabled=qiuiEnabled[src]==true,qiuiAvailable=Config.QIUI.AdapterResource~='' and GetResourceState(Config.QIUI.AdapterResource)=='started'})
+end
+RegisterNetEvent('xtoys:requestAdvancedState',function() sendAdvancedState(source) end)
+local function stopOwnerControl(owner)
+ for controller,target in pairs(activeController) do
+  if controller==owner or target==owner then
+   activeController[controller]=nil
+   stopLocal(owner)
+   if controller~=owner then stopLocal(controller) end
+  end
+ end
+end
+RegisterNetEvent('xtoys:setControlMode',function(mode)
+ local src=source
+ if mode~='self' and mode~='trusted' and mode~='one_time' then return end
+ controlModes[src]=mode
+ stopOwnerControl(src)
+ if mode=='self' then msg(src,'Self Control enabled. Remote control stopped.')
+ elseif mode=='trusted' then msg(src,'Trusted Partner mode enabled. Only saved trusted partners may control your toy.')
+ else msg(src,'One-Time Partner mode enabled. Each request requires your approval.') end
+ sendAdvancedState(src); state(src)
+end)
+RegisterNetEvent('xtoys:setQiuiEnabled',function(enabled)
+ local src=source
+ if enabled==true then
+  local adapter=Config.QIUI.AdapterResource
+  if adapter=='' or GetResourceState(adapter)~='started' then
+   qiuiEnabled[src]=nil; sendAdvancedState(src)
+   return msg(src,'QIUI unavailable: no configured, running model-specific adapter.', 'error')
+  end
+  qiuiEnabled[src]=true
+ else qiuiEnabled[src]=nil; msg(src,'QIUI integration disabled. No QIUI commands will be sent.') end
+ sendAdvancedState(src)
+end)
+RegisterNetEvent('xtoys:qiuiRequest',function(action)
+ local src=source
+ if qiuiEnabled[src]~=true then return msg(src,'QIUI integration is disabled.','error') end
+ if action~='lock' and action~='unlock' then return end
+ -- Deliberately no guessed device protocol: a verified model adapter must be wired here.
+ msg(src,'No verified QIUI device adapter is implemented. No device command was sent.','error')
 end)
