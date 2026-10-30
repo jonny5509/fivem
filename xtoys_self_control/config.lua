@@ -7,6 +7,11 @@ Config = {
     Debug = false,
     MaxIntensity = 100,
 
+    Partner = {
+        Enabled = true,
+        MaximumDistanceMeters = 15.0
+    },
+
     Bollards = {
         Enabled = true,
         IntensityStep = 10,
