@@ -7,6 +7,22 @@ Config = {
     Debug = false,
     MaxIntensity = 100,
 
+    Bollards = {
+        Enabled = true,
+        IntensityStep = 10,
+        IdleStopMilliseconds = 30000,
+        ScanIntervalMilliseconds = 200,
+        NearbyDistanceMeters = 8,
+        TipAngleDegrees = 30,
+        Models = {
+            'prop_bollard_01a', 'prop_bollard_01b', 'prop_bollard_01c',
+            'prop_bollard_02a', 'prop_bollard_02b', 'prop_bollard_02c',
+            'prop_bollard_03a', 'prop_bollard_04', 'prop_bollard_05',
+            'prop_roadcone01a', 'prop_roadcone02a', 'prop_barier_conc_01a',
+            'prop_mp_arrow_barrier_01'
+        }
+    },
+
     XToysActions = {
         SetIntensity = 'setintensity',
         Stop = 'stop'
