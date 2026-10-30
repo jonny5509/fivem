@@ -6,6 +6,7 @@ local function debugLog(src, message)
 end
 
 local paired, pendingInvites, pendingControl, activeController = {}, {}, {}, {}
+local controlModes, qiuiEnabled = {}, {}
 local pendingTrustedInvites, trusted = {}, {}
 
 local function identifier(src)
@@ -393,7 +394,6 @@ AddEventHandler('playerDropped', function()
 end)
 
 
-local controlModes, qiuiEnabled = {}, {}
 local function sendAdvancedState(src)
  TriggerClientEvent('xtoys:advancedState',src,{controlMode=controlModes[src] or 'self',qiuiEnabled=qiuiEnabled[src]==true,qiuiAvailable=Config.QIUI.AdapterResource~='' and GetResourceState(Config.QIUI.AdapterResource)=='started'})
 end
