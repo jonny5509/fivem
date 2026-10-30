@@ -33,3 +33,8 @@ $('send').onclick=()=>{if(approved)nui('control',{intensity:+$('level').value,du
 $('stop').onclick=()=>{sendXToys({action:'stop'});nui('emergencyStop');approved=false;$('controls').classList.add('hidden');};
 $('revoke').onclick=()=>{nui('revoke');approved=false;$('controls').classList.add('hidden');};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('app').classList.contains('hidden'))$('close').click();});
+$('controlMode').onchange=()=>nui('setControlMode',{mode:$('controlMode').value});
+$('qiuiEnabled').onchange=()=>nui('setQiuiEnabled',{enabled:$('qiuiEnabled').checked});
+$('qiuiLock').onclick=()=>nui('qiuiAction',{action:'lock'});
+$('qiuiUnlock').onclick=()=>{if(confirm('Request an explicit unlock?'))nui('qiuiAction',{action:'unlock'});};
+window.addEventListener('message',e=>{const d=e.data||{};if(d.type!=='advancedState')return;const s=d.state||{};if(s.controlMode){$('controlMode').value=s.controlMode;$('modeHint').textContent=s.controlMode==='self'?'Your own gameplay events control your own toy.':s.controlMode==='trusted'?'Only a saved trusted partner can control your toy.':'A partner must request control and you must approve.';}if(typeof s.qiuiEnabled==='boolean')$('qiuiEnabled').checked=s.qiuiEnabled;$('qiuiEnabled').disabled=!s.qiuiAvailable;$('qiuiStatus').textContent=s.qiuiAvailable?'Adapter resource detected; device protocol still requires verification.':'Unavailable: no model-specific QIUI adapter configured.';$('qiuiLock').disabled=!s.qiuiAvailable||!s.qiuiEnabled;$('qiuiUnlock').disabled=!s.qiuiAvailable||!s.qiuiEnabled;});
