@@ -443,3 +443,137 @@ RegisterNetEvent('xtoys:qiuiRequest',function(action)
  -- Deliberately no guessed device protocol: a verified model adapter must be wired here.
  msg(src,'No verified QIUI device adapter is implemented. No device command was sent.','error')
 end)
+
+
+-- Special Partner lifecycle (exclusive per owner, consent + owner confirmation).
+local specialRecords = {}
+local function loadSpecialRecords()
+ local raw=GetResourceKvpString('xtoys_special_partners_v1')
+ if raw and raw~='' then local ok,data=pcall(json.decode,raw); if ok and type(data)=='table' then specialRecords=data end end
+end
+local function saveSpecialRecords()
+ SetResourceKvp('xtoys_special_partners_v1',json.encode(specialRecords))
+end
+local function specialRecord(ownerId)
+ local rec=specialRecords[ownerId]
+ if not rec then rec={}; specialRecords[ownerId]=rec end
+ return rec
+end
+local function sendSpecialState(src)
+ local own=identifier(src); if not own then return end
+ local rec=specialRecords[own] or {}
+ local incoming={}
+ for ownerId,offerRec in pairs(specialRecords) do
+  local offer=offerRec.offer
+  if offer and offer.targetId==own and (offer.expiresAt or 0)>os.time() then
+   incoming[#incoming+1]={ownerId=ownerId,ownerName=offer.ownerName or 'Owner',accepted=offer.accepted==true,expiresAt=offer.expiresAt}
+  end
+ end
+ local partnerOnline=rec.specialId and findOnline(rec.specialId) or nil
+ TriggerClientEvent('xtoys:specialState',src,{
+  specialPartnerId=rec.specialId,
+  specialPartnerName=rec.specialName,
+  specialPartnerOnline=partnerOnline~=nil,
+  specialPartnerLastSeen=rec.lastSeen,
+  pendingOffer=rec.offer and {targetName=rec.offer.targetName,accepted=rec.offer.accepted==true,expiresAt=rec.offer.expiresAt} or nil,
+  incomingOffers=incoming
+ })
+end
+local function notifySpecialOwner(ownerId,text,kind)
+ local owner=findOnline(ownerId)
+ if owner then msg(owner,text,kind); sendSpecialState(owner) end
+end
+local function expireSpecial(ownerId,rec)
+ local oldName=rec.specialName or 'Special Partner'
+ rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil
+ saveSpecialRecords()
+ notifySpecialOwner(ownerId,oldName..' was offline for more than 72 hours. Special Partner permissions expired; control is yours again. You can offer the role to someone else or leave it disabled.','warning')
+end
+local function checkSpecialExpiry()
+ local now=os.time()
+ for ownerId,rec in pairs(specialRecords) do
+  if rec.offer and (rec.offer.expiresAt or 0)<=now then
+   local target=findOnline(rec.offer.targetId)
+   rec.offer=nil; saveSpecialRecords()
+   if target then msg(target,'Special Partner offer expired. No role was assigned.','warning') end
+   notifySpecialOwner(ownerId,'Your Special Partner offer expired. No one was assigned.','warning')
+  end
+  if rec.specialId then
+   local online=findOnline(rec.specialId)
+   if online then
+    rec.lastSeen=now
+   elseif rec.lastSeen and now-rec.lastSeen >= (Config.SpecialPartner.OfflineExpiryHours or 72)*3600 then
+    expireSpecial(ownerId,rec)
+   end
+  end
+ end
+end
+RegisterNetEvent('xtoys:specialStateRequest',function()
+ local src=source; local own=identifier(src); if not own then return end
+ local rec=specialRecords[own]
+ if rec and rec.specialId and not findOnline(rec.specialId) and rec.lastSeen and os.time()-rec.lastSeen >= (Config.SpecialPartner.OfflineExpiryHours or 72)*3600 then expireSpecial(own,rec) end
+ sendSpecialState(src)
+end)
+RegisterNetEvent('xtoys:specialOffer',function(target)
+ local src=source; local own=identifier(src); target=tonumber(target)
+ if not Config.SpecialPartner.Enabled then return msg(src,'Special Partner feature is disabled.','error') end
+ if not own or not target or target==src or not GetPlayerName(target) or not isTrusted(src,target) then return msg(src,'Choose an online trusted partner.','error') end
+ local targetId=identifier(target); if not targetId then return msg(src,'Could not verify that partner.','error') end
+ local rec=specialRecord(own)
+ if rec.specialId==targetId then return msg(src,'That player is already your Special Partner.','warning') end
+ rec.offer={targetId=targetId,targetName=GetPlayerName(target),ownerName=GetPlayerName(src),ownerId=own,accepted=false,expiresAt=os.time()+(Config.SpecialPartner.OfferExpiryHours or 48)*3600}
+ saveSpecialRecords()
+ msg(src,'Special Partner offer sent. The recipient must accept, then you must confirm the transfer.')
+ msg(target,GetPlayerName(src)..' offered you Special Partner status. This is exclusive and grants the QIUI permissions supported by the verified device adapter. You may decline; the owner retains emergency override and can revoke access. If you are offline for 72 hours, your role expires. No automatic device unlock is implied.')
+ sendSpecialState(src); sendSpecialState(target)
+end)
+RegisterNetEvent('xtoys:specialAccept',function(ownerId)
+ local src=source; local own=identifier(src); local rec=specialRecords[ownerId]; local offer=rec and rec.offer
+ if not own or not offer or offer.targetId~=own or (offer.expiresAt or 0)<=os.time() then return msg(src,'That Special Partner offer is no longer valid.','error') end
+ offer.accepted=true; saveSpecialRecords()
+ msg(src,'You accepted. The owner must now confirm before the role becomes active.')
+ notifySpecialOwner(ownerId,GetPlayerName(src)..' accepted your Special Partner offer. Confirm the transfer in /xtoys to activate the role.')
+ sendSpecialState(src)
+end)
+RegisterNetEvent('xtoys:specialDecline',function(ownerId)
+ local src=source; local own=identifier(src); local rec=specialRecords[ownerId]; local offer=rec and rec.offer
+ if not own or not offer or offer.targetId~=own then return end
+ rec.offer=nil; saveSpecialRecords()
+ msg(src,'Special Partner offer declined.')
+ notifySpecialOwner(ownerId,GetPlayerName(src)..' declined the Special Partner offer. Your control remains unchanged.','warning')
+end)
+RegisterNetEvent('xtoys:specialConfirm',function()
+ local src=source; local own=identifier(src); local rec=own and specialRecords[own]; local offer=rec and rec.offer
+ if not offer or not offer.accepted or (offer.expiresAt or 0)<=os.time() then return msg(src,'There is no accepted, valid offer to confirm.','error') end
+ local target=findOnline(offer.targetId)
+ if not target then return msg(src,'The invited partner must be online for final confirmation.','error') end
+ local oldId=rec.specialId
+ rec.specialId=offer.targetId; rec.specialName=offer.targetName; rec.lastSeen=os.time(); rec.offer=nil
+ saveSpecialRecords()
+ msg(src,'Special Partner transfer confirmed. You retain emergency override and can revoke the role at any time.')
+ msg(target,'You are now the owner’s sole Special Partner. The role expires after 72 consecutive hours offline. The owner retains emergency override and can revoke access. QIUI device commands remain unavailable until a verified Cellmate 2 adapter is installed.')
+ if oldId and oldId~=rec.specialId then local old=findOnline(oldId); if old then msg(old,'Your Special Partner role has been replaced by the owner.','warning') end end
+ sendSpecialState(src); sendSpecialState(target)
+end)
+RegisterNetEvent('xtoys:specialRevoke',function()
+ local src=source; local own=identifier(src); local rec=own and specialRecords[own]
+ if not rec then return msg(src,'No Special Partner is assigned.','warning') end
+ local old=rec.specialId and findOnline(rec.specialId)
+ rec.specialId=nil; rec.specialName=nil; rec.lastSeen=nil; rec.offer=nil
+ saveSpecialRecords()
+ msg(src,'Special Partner access revoked. Control remains with you.')
+ if old then msg(old,'The owner revoked your Special Partner access.','warning'); sendSpecialState(old) end
+ sendSpecialState(src)
+end)
+AddEventHandler('playerDropped',function()
+ local src=source; local id=identifier(src)
+ if id then
+  for ownerId,rec in pairs(specialRecords) do
+   if rec.specialId==id then rec.lastSeen=os.time(); saveSpecialRecords(); notifySpecialOwner(ownerId,'Your Special Partner went offline. The 72-hour expiry window has started.','warning') end
+  end
+ end
+end)
+CreateThread(function()
+ Wait(2000); loadSpecialRecords()
+ while true do Wait(60000); checkSpecialExpiry() end
+end)
