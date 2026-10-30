@@ -174,7 +174,9 @@ CreateThread(function()
   if selfMode then
    local ped=PlayerPedId()
    local shooting=IsPedShooting(ped)
-   if shooting then pulse(Config.SelfControl.ContinuousFireIntensity,1)
+   if shooting then
+    if not firing then pulse(Config.SelfControl.ContinuousFireIntensity, math.random(Config.SelfControl.ShotMinSeconds, Config.SelfControl.ShotMaxSeconds))
+    else pulse(Config.SelfControl.ContinuousFireIntensity,1) end
    elseif firing then stopGameplay() end
    firing=shooting
    local now=GetGameTimer()
