@@ -1,14 +1,16 @@
 local debugEnabled = Config.Debug == true
 local gameplayEnabled = true
 local gameplayActive = false
-local lastEventAt = 0
-local lastVehicleSpeed = 0
+local lastEventAt = {}
+local lastVehicleSpeed = 0.0
 local wasFiring = false
 local fireStartedAt = 0
 local lastFirePulseAt = 0
-local burstStopAt = nil
 local fireBurst = false
 local wasMelee = false
+local wasFalling = false
+local wasRagdoll = false
+local lastVehicleCollisionAt = 0
 
 local function log(message)
     if debugEnabled then
@@ -20,14 +22,25 @@ local function notify(message)
     SendNUIMessage({ type = 'toast', message = message })
 end
 
-local function pulse(intensity, duration)
+local function eventReady(key, cooldown)
+    local now = GetGameTimer()
+    local waitMs = cooldown or Config.SelfControl.EventCooldownMilliseconds
+    if lastEventAt[key] and now - lastEventAt[key] < waitMs then
+        return false
+    end
+    lastEventAt[key] = now
+    return true
+end
+
+local function pulse(intensity, duration, source)
     if not gameplayEnabled then return end
 
     intensity = math.max(0, math.min(Config.MaxIntensity, tonumber(intensity) or 0))
-    duration = math.max(1, tonumber(duration) or 1)
+    duration = math.max(1, math.min(Config.SelfControl.MaxDurationSeconds, tonumber(duration) or 1))
+    if intensity <= 0 then return end
 
     gameplayActive = true
-    log(('Pulse: intensity=%d duration=%s'):format(intensity, tostring(duration)))
+    log(('Pulse [%s]: intensity=%d duration=%s'):format(source or 'gameplay', intensity, tostring(duration)))
     SendNUIMessage({
         type = 'xtoysCommand',
         action = Config.XToysActions.SetIntensity,
@@ -59,9 +72,11 @@ RegisterCommand(Config.OpenCommand, function()
 end, false)
 
 RegisterCommand(Config.StopCommand, function()
+    gameplayEnabled = false
     stopToy()
     SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
-    notify('Emergency stop sent.')
+    notify('Emergency stop sent. Gameplay triggers are paused; use /xtoys to re-enable them.')
+    SendNUIMessage({ type = 'enabledState', enabled = false })
 end, false)
 
 RegisterCommand(Config.ConnectCommand, function(_, args)
@@ -77,8 +92,12 @@ RegisterCommand(Config.DebugCommand, function(_, args)
     elseif mode == 'off' then
         debugEnabled = false
         notify('Debug logging disabled.')
+    elseif mode == 'resume' then
+        gameplayEnabled = true
+        notify('Gameplay triggers resumed.')
+        SendNUIMessage({ type = 'enabledState', enabled = true })
     else
-        notify('Client debug logging: ' .. (debugEnabled and 'ON' or 'OFF'))
+        notify(('Debug: %s | Gameplay: %s'):format(debugEnabled and 'ON' or 'OFF', gameplayEnabled and 'ON' or 'PAUSED'))
     end
 end, false)
 
@@ -95,18 +114,11 @@ RegisterNUICallback('setEnabled', function(data, cb)
 end)
 
 RegisterNUICallback('emergencyStop', function(_, cb)
+    gameplayEnabled = false
     stopToy()
     SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
+    SendNUIMessage({ type = 'enabledState', enabled = false })
     cb({ ok = true })
-end)
-
-RegisterNetEvent('onClientResourceStart', function(resource)
-    if resource ~= GetCurrentResourceName() then return end
-    TriggerEvent('chat:addSuggestion', '/' .. Config.OpenCommand, 'Open xToys Self Control')
-    TriggerEvent('chat:addSuggestion', '/' .. Config.ConnectCommand, 'Connect your private xToys webhook', {
-        { name = 'webhook_id', help = 'Your private XToys webhook ID' }
-    })
-    TriggerEvent('chat:addSuggestion', '/' .. Config.StopCommand, 'Emergency stop your xToys device')
 end)
 
 CreateThread(function()
@@ -116,75 +128,76 @@ CreateThread(function()
         if not gameplayEnabled then
             wasFiring = false
             wasMelee = false
-            stopToy()
+            wasFalling = false
+            wasRagdoll = false
+            lastVehicleSpeed = 0.0
         else
             local ped = PlayerPedId()
-            local now = GetGameTimer()
-            local firing = IsPedShooting(ped)
+            if ped ~= 0 and DoesEntityExist(ped) then
+                local now = GetGameTimer()
+                local firing = IsPedShooting(ped)
 
-            if firing then
-                if not wasFiring then
-                    fireStartedAt = now
-                    fireBurst = false
-                    burstStopAt = nil
-                    local duration = math.random(Config.SelfControl.ShotMinSeconds, Config.SelfControl.ShotMaxSeconds)
-                    pulse(Config.SelfControl.ContinuousFireIntensity, duration)
-                    lastFirePulseAt = now
-                else
-                    -- Holding an automatic weapon beyond this window is treated as a burst.
-                    if now - fireStartedAt >= 350 then
-                        fireBurst = true
-                    end
-                    if fireBurst and now - lastFirePulseAt >= Config.SelfControl.ContinuousRefreshSeconds * 1000 then
-                        pulse(Config.SelfControl.ContinuousFireIntensity, Config.SelfControl.ContinuousRefreshSeconds)
+                if firing then
+                    if not wasFiring then
+                        fireStartedAt = now
+                        fireBurst = false
+                        pulse(Config.SelfControl.ContinuousFireIntensity,
+                            math.random(Config.SelfControl.ShotMinSeconds, Config.SelfControl.ShotMaxSeconds),
+                            'shooting')
                         lastFirePulseAt = now
+                    else
+                        if now - fireStartedAt >= Config.SelfControl.AutomaticFireThresholdMilliseconds then
+                            fireBurst = true
+                        end
+                        if fireBurst and now - lastFirePulseAt >= Config.SelfControl.ContinuousRefreshSeconds * 1000 then
+                            pulse(Config.SelfControl.ContinuousFireIntensity,
+                                Config.SelfControl.ContinuousRefreshSeconds, 'automatic fire')
+                            lastFirePulseAt = now
+                        end
                     end
-                end
-                wasFiring = true
-            else
-                if wasFiring then
+                    wasFiring = true
+                elseif wasFiring then
                     wasFiring = false
                     if fireBurst then
-                        burstStopAt = now + 250
+                        stopToy()
+                        fireBurst = false
                     end
                 end
-                -- A single shot is allowed to finish its configured random-duration pulse.
-                -- Sustained/automatic fire is explicitly stopped shortly after firing ends.
-                if fireBurst and burstStopAt and now >= burstStopAt then
-                    stopToy()
-                    fireBurst = false
-                    burstStopAt = nil
-                end
-            end
 
-            if Config.SelfControl.EnableFalls
-                and (IsPedFalling(ped) or IsPedRagdoll(ped))
-                and now - lastEventAt >= Config.SelfControl.EventCooldownMilliseconds then
-                lastEventAt = now
-                pulse(Config.SelfControl.FallIntensity, Config.SelfControl.FallDurationSeconds)
-            end
-
-            if Config.SelfControl.EnableCollisions and IsPedInAnyVehicle(ped, false) then
-                local vehicle = GetVehiclePedIsIn(ped, false)
-                local speed = GetEntitySpeed(vehicle)
-                if lastVehicleSpeed - speed > 8.0
-                    and now - lastEventAt >= Config.SelfControl.EventCooldownMilliseconds then
-                    lastEventAt = now
-                    pulse(Config.SelfControl.CollisionIntensity, Config.SelfControl.CollisionDurationSeconds)
+                if Config.SelfControl.EnableFalls then
+                    local falling = IsPedFalling(ped)
+                    local ragdoll = IsPedRagdoll(ped)
+                    if (falling and not wasFalling) and eventReady('fall') then
+                        pulse(Config.SelfControl.FallIntensity, Config.SelfControl.FallDurationSeconds, 'fall')
+                    elseif (ragdoll and not wasRagdoll) and eventReady('ragdoll') then
+                        pulse(Config.SelfControl.FallIntensity, Config.SelfControl.FallDurationSeconds, 'ragdoll')
+                    end
+                    wasFalling = falling
+                    wasRagdoll = ragdoll
                 end
-                lastVehicleSpeed = speed
-            else
-                lastVehicleSpeed = 0
-            end
 
-            if Config.SelfControl.EnableMelee then
-                local melee = IsPedInMeleeCombat(ped)
-                if melee and not wasMelee
-                    and now - lastEventAt >= Config.SelfControl.EventCooldownMilliseconds then
-                    lastEventAt = now
-                    pulse(Config.SelfControl.MeleeIntensity, Config.SelfControl.MeleeDurationSeconds)
+                if Config.SelfControl.EnableCollisions and IsPedInAnyVehicle(ped, false) then
+                    local vehicle = GetVehiclePedIsIn(ped, false)
+                    local speed = GetEntitySpeed(vehicle)
+                    local speedDrop = lastVehicleSpeed - speed
+                    local collided = HasEntityCollidedWithAnything(vehicle)
+                    if (speedDrop >= Config.SelfControl.CollisionSpeedDrop
+                        or collided and speed >= Config.SelfControl.MinimumCollisionSpeed)
+                        and eventReady('vehicle_collision', Config.SelfControl.CollisionCooldownMilliseconds) then
+                        pulse(Config.SelfControl.CollisionIntensity, Config.SelfControl.CollisionDurationSeconds, 'vehicle collision')
+                    end
+                    lastVehicleSpeed = speed
+                else
+                    lastVehicleSpeed = 0.0
                 end
-                wasMelee = melee
+
+                if Config.SelfControl.EnableMelee then
+                    local melee = IsPedInMeleeCombat(ped)
+                    if melee and not wasMelee and eventReady('melee') then
+                        pulse(Config.SelfControl.MeleeIntensity, Config.SelfControl.MeleeDurationSeconds, 'melee')
+                    end
+                    wasMelee = melee
+                end
             end
         end
     end
@@ -194,20 +207,18 @@ AddEventHandler('gameEventTriggered', function(eventName, args)
     if not gameplayEnabled or not args then return end
 
     local ped = PlayerPedId()
-    local now = GetGameTimer()
+    if ped == 0 then return end
 
     if eventName == 'CEventNetworkEntityDamage'
-        and args[1] == ped
         and Config.SelfControl.EnableDamage
-        and now - lastEventAt >= Config.SelfControl.EventCooldownMilliseconds then
-        lastEventAt = now
-        pulse(Config.SelfControl.DamageIntensity, Config.SelfControl.DamageDurationSeconds)
+        and args[1] == ped
+        and eventReady('damage') then
+        pulse(Config.SelfControl.DamageIntensity, Config.SelfControl.DamageDurationSeconds, 'damage')
 
     elseif eventName == 'CEventShockingExplosion'
         and Config.SelfControl.EnableExplosions
-        and now - lastEventAt >= Config.SelfControl.EventCooldownMilliseconds then
-        lastEventAt = now
-        pulse(Config.SelfControl.ExplosionIntensity, Config.SelfControl.ExplosionDurationSeconds)
+        and eventReady('explosion', Config.SelfControl.ExplosionCooldownMilliseconds) then
+        pulse(Config.SelfControl.ExplosionIntensity, Config.SelfControl.ExplosionDurationSeconds, 'explosion')
     end
 end)
 
