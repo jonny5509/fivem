@@ -7,6 +7,7 @@ local wasFiring = false
 local fireStartedAt = 0
 local lastFirePulseAt = 0
 local fireBurst = false
+local receivingPartnerEvent = false
 local wasMelee = false
 local wasFalling = false
 local wasRagdoll = false
@@ -39,6 +40,9 @@ local function pulse(intensity, duration, source)
     if intensity <= 0 then return end
 
     gameplayActive = true
+    if not receivingPartnerEvent then
+        TriggerServerEvent('xtoys:selfControlSharePulse', intensity, duration, tostring(source or 'gameplay'))
+    end
     log(('Pulse [%s]: intensity=%d duration=%s'):format(source or 'gameplay', intensity, tostring(duration)))
     SendNUIMessage({
         type = 'xtoysCommand',
@@ -48,7 +52,8 @@ local function pulse(intensity, duration, source)
     })
 end
 
-local function stopToy(force)
+local function stopToy(force, fromPartner)
+    if not fromPartner then TriggerServerEvent('xtoys:selfControlShareStop') end
     if gameplayActive or force then
         SendNUIMessage({ type = 'xtoysStop', action = Config.XToysActions.Stop })
         gameplayActive = false
@@ -78,6 +83,40 @@ local function connectFromCommand(webhookId)
 end
 
 RegisterCommand(Config.OpenCommand, openMenu, false)
+
+-- Partner sharing is opt-in: invite with /xtoyspartner SERVER_ID, then the
+-- other player accepts with /xtoyspartneraccept SERVER_ID.
+RegisterCommand('xtoyspartner', function(_, args)
+    local target = tonumber(args[1])
+    if not target then notify('Usage: /xtoyspartner SERVER_ID') return end
+    TriggerServerEvent('xtoys:selfControlPartnerInvite', target)
+end, false)
+RegisterCommand('xtoyspartneraccept', function(_, args)
+    local inviter = tonumber(args[1])
+    if not inviter then notify('Usage: /xtoyspartneraccept SERVER_ID') return end
+    TriggerServerEvent('xtoys:selfControlPartnerAccept', inviter)
+end, false)
+RegisterCommand('xtoyspartnerdecline', function(_, args)
+    local inviter = tonumber(args[1])
+    if not inviter then notify('Usage: /xtoyspartnerdecline SERVER_ID') return end
+    TriggerServerEvent('xtoys:selfControlPartnerDecline', inviter)
+end, false)
+RegisterCommand('xtoyspartnerstop', function()
+    TriggerServerEvent('xtoys:selfControlPartnerEnd')
+end, false)
+
+RegisterNetEvent('xtoys:selfControlPartnerNotice', function(message)
+    notify(message)
+end)
+RegisterNetEvent('xtoys:selfControlPartnerPulse', function(intensity, duration, eventSource)
+    if not gameplayEnabled then return end
+    receivingPartnerEvent = true
+    pulse(intensity, duration, 'partner: ' .. tostring(eventSource or 'gameplay'))
+    receivingPartnerEvent = false
+end)
+RegisterNetEvent('xtoys:selfControlPartnerStop', function()
+    stopToy(true, true)
+end)
 RegisterCommand('+xtoys_menu', openMenu, false)
 RegisterCommand('-xtoys_menu', function() end, false)
 RegisterKeyMapping('+xtoys_menu', 'Open xToys Self Control menu', 'keyboard', 'F7')
