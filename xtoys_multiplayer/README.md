@@ -57,3 +57,18 @@ Test on a private server with two consenting test players. Verify nearby detecti
 
 ## Notes
 This resource has not been runtime-tested against your server's artifact build or your specific XToys Script. The server authorizes pairing and commands; it cannot independently confirm physical toy connectivity. Webhook credentials are held in NUI memory only and must be re-entered after a resource/UI restart.
+
+
+## Advanced control modes
+- The menu provides Self Control, Trusted Partner, and One-Time Partner modes. The server enforces the owner-selected mode; switching modes stops active remote control.
+- Self Control sends commands only to the local player's own webhook. Shooting is refreshed while firing at the configured intensity (100 by default) and stopped when firing ends. Damage, falls/ragdolls, sudden vehicle deceleration, and explosion game events can produce short pulses.
+- Ordinary running and footsteps are intentionally excluded. Gameplay event detection can vary by FiveM/GTA build and must be tested on your server.
+
+## QIUI integration status and required lock policy
+- QIUI is OFF by default. The UI only permits enabling if a configured adapter resource is running.
+- The exact QIUI model and its documented API/BLE protocol are not yet known. This commit does not guess a protocol and does not send physical lock/unlock commands. The adapter must be implemented for the exact model before device control is available.
+- Required future behaviour: no countdown, no scheduled release, and no automatic unlock on disconnect or restart. Unlock only after an explicit authenticated owner or authorised Special Partner action.
+- No physical QIUI lock state is currently controlled or persisted by this resource. The QIUI UI is a guarded placeholder, not a working device integration.
+
+## Special Partner status
+The exclusive Special Partner role, transfer offers, acceptance/owner confirmation, and 72-hour offline expiry workflow are not implemented in this commit. These require the role lifecycle to be completed alongside the model-specific QIUI adapter so ordinary trusted partners cannot gain device permissions.
