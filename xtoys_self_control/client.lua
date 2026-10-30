@@ -232,3 +232,87 @@ AddEventHandler('onResourceStop', function(resource)
         SetNuiFocus(false, false)
     end
 end)
+
+
+-- Detect impacts with configured roadside props. The server validates and broadcasts
+-- each accepted hit so every connected Self Control client can react.
+local bollardModels = {}
+for _, modelName in ipairs(Config.Bollards.Models or {}) do
+    bollardModels[GetHashKey(modelName)] = true
+end
+local bollardStates = {}
+local bollardIntensity = 0
+local lastBollardHitAt = 0
+local lastBollardPulseAt = 0
+
+RegisterNetEvent('xtoys:selfControlBollardHit', function()
+    if not gameplayEnabled or not Config.Bollards.Enabled then return end
+    bollardIntensity = math.min(Config.MaxIntensity,
+        bollardIntensity + (Config.Bollards.IntensityStep or 10))
+    lastBollardHitAt = GetGameTimer()
+    pulse(bollardIntensity, 2, 'bollard impact')
+    lastBollardPulseAt = lastBollardHitAt
+end)
+
+CreateThread(function()
+    while true do
+        Wait(Config.Bollards.ScanIntervalMilliseconds or 200)
+        if Config.Bollards.Enabled and gameplayEnabled then
+            local ped = PlayerPedId()
+            if ped ~= 0 and DoesEntityExist(ped) and IsPedInAnyVehicle(ped, false) then
+                local vehicle = GetVehiclePedIsIn(ped, false)
+                local vehicleCoords = GetEntityCoords(vehicle)
+                for _, object in ipairs(GetGamePool('CObject')) do
+                    if DoesEntityExist(object) and bollardModels[GetEntityModel(object)] then
+                        local coords = GetEntityCoords(object)
+                        if #(vehicleCoords - coords) <= (Config.Bollards.NearbyDistanceMeters or 8) then
+                            local rotation = GetEntityRotation(object, 2)
+                            local tipped = math.max(math.abs(rotation.x), math.abs(rotation.y))
+                                >= (Config.Bollards.TipAngleDegrees or 30)
+                            local velocity = GetEntityVelocity(object)
+                            local speed = #velocity
+                            local state = bollardStates[object]
+                            if not state then
+                                bollardStates[object] = { coords = coords, tipped = tipped, reported = false }
+                            else
+                                local moved = #(coords - state.coords)
+                                local knocked = (tipped and not state.tipped) or moved >= 0.45 or speed >= 0.8
+                                if knocked and not state.reported then
+                                    TriggerServerEvent('xtoys:reportSelfControlBollardHit',
+                                        coords.x, coords.y, coords.z, GetEntityModel(object))
+                                    state.reported = true
+                                end
+                                if not state.reported then state.coords = coords end
+                                state.tipped = tipped
+                            end
+                        end
+                    end
+                end
+                for object in pairs(bollardStates) do
+                    if not DoesEntityExist(object) then bollardStates[object] = nil end
+                end
+            end
+        end
+    end
+end)
+
+CreateThread(function()
+    while true do
+        Wait(500)
+        if lastBollardHitAt > 0 and gameplayEnabled then
+            local now = GetGameTimer()
+            if now - lastBollardHitAt >= (Config.Bollards.IdleStopMilliseconds or 30000) then
+                bollardIntensity = 0
+                lastBollardHitAt = 0
+                stopToy()
+            elseif now - lastBollardPulseAt >= 900 then
+                pulse(bollardIntensity, 2, 'bollard hold')
+                lastBollardPulseAt = now
+            end
+        elseif not gameplayEnabled then
+            bollardIntensity = 0
+            lastBollardHitAt = 0
+        end
+    end
+end)
+
