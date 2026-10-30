@@ -1,53 +1,49 @@
 # xToys Self Control
 
-This folder is the FiveM-resource implementation: it can automatically detect local gameplay events, but FiveM servers must distribute/start it as a resource.
+A client-only FiveM resource that detects selected local gameplay events and sends commands directly from the player's NUI to their private XToys webhook.
 
-**Want to run locally without any server-side installation?** Use the separate [Windows Local Companion](../xtoys_self_control_companion/README.md). It connects directly to your private XToys webhook and uses manual global hotkeys. It does not inspect or inject into FiveM, and cannot automatically detect in-game events.
+**Server requirement:** although gameplay logic and webhook communication run on the player's client, a FiveM server must distribute/start this resource. It is not an independent graphics-pack-style client mod.
 
----
+## Install
 
-# xToys Self Control (client-only FiveM resource)
-
-A small standalone resource that connects one player's private XToys webhook and uses that player's own GTA/FiveM gameplay events to trigger their own toy.
-
-There is no multiplayer pairing, trusted-partner system, Special Partner role, QIUI integration, server.lua, framework dependency, or server-side command relay.
-
-## Installation
-
-This is a **client-script-only** FiveM resource, but standard FiveM servers still distribute and start resources through the server's resource manifest:
-
-1. Put the `xtoys_self_control` folder in the FiveM server's `resources` directory.
+1. Place `xtoys_self_control` in the server's resources folder.
 2. Add `ensure xtoys_self_control` to `server.cfg`.
 3. Restart the resource/server.
-4. In game, run `/xtoys` to open the local menu.
-5. Enter your own private XToys webhook ID and press Connect, or run `/xtoysconnect YOUR_WEBHOOK_ID`.
-6. Use `/xtoysstop` for an emergency stop.
+4. Join and run `/xtoys`.
+5. Enter your private XToys webhook ID, then connect. Alternatively use `/xtoysconnect YOUR_PRIVATE_WEBHOOK_ID`.
+6. Use `/xtoysstop` for an emergency stop. This pauses gameplay triggers; use `/xtoysdebug resume` to resume them.
 
-Only `client.lua` runs gameplay detection. There is no `server.lua`; no player IDs, pairing data, or webhook credentials are sent to a custom server script. A player cannot independently install an arbitrary FiveM resource onto a server they do not control; the server owner/admin must add and ensure the resource so clients receive it.
+The resource has no `server.lua`, framework dependency, pairing system, trusted-partner role, or QIUI adapter.
 
-## XToys setup
+## Events
 
-The NUI connects to `wss://webhook.xtoys.app/<webhookid>`. Create a private webhook in XToys and configure your XToys Script to respond to:
+- Shooting: a short pulse on the first detected shot; sustained firing refreshes while firing.
+- Damage: when the local player is the damaged entity.
+- Explosions: the GTA/FiveM shocking-explosion game event.
+- Vehicle collisions: significant speed loss or collision detection while in a vehicle.
+- Falls/ragdoll: on entering a fall or ragdoll state.
+- Melee: on entering melee combat.
 
-- `{"action":"setintensity","intensity":20,"seconds":2}`
-- `{"action":"stop"}`
+Detection depends on the FiveM/GTA build and game event availability. These are best-effort client-side signals, not guaranteed coverage of every action or server-custom event.
 
-The actual toy response depends on your XToys Script configuration. The webhook ID is held in NUI memory only and must be entered again after a resource/UI restart. Use a private webhook; the browser WebSocket API cannot attach the custom Authorization header required by shared webhooks.
+## Local configuration
 
-## Gameplay triggers
+Edit `config.lua` to change intensity, duration, cooldowns and event toggles. Intensities are capped by `MaxIntensity`; pulse duration is capped by `MaxDurationSeconds`.
 
-- Shooting: a random-duration pulse for the first shot; automatic fire is refreshed while firing and stopped when firing ends.
-- Damage: pulse when the local player is the damaged entity.
-- Explosions: pulse on the relevant GTA game event.
-- Vehicle impacts: pulse on a significant sudden speed drop while in a vehicle.
-- Falls/ragdolls: pulse while falling or ragdolling, subject to the shared event cooldown.
-- Melee: pulse when entering melee combat.
+Commands:
+- `/xtoys` — open the menu.
+- `/xtoysconnect YOUR_PRIVATE_WEBHOOK_ID` — connect.
+- `/xtoysstop` — emergency stop and pause triggers.
+- `/xtoysdebug on|off|resume|status` — debug logging and trigger state.
 
-Ordinary running and footsteps are intentionally excluded. Event detection and game-event argument behaviour can vary by FiveM/GTA build. Tune values and enable/disable triggers in `config.lua`.
+## XToys
 
-## Safety and limitations
+The NUI connects to `wss://webhook.xtoys.app/<webhookid>` and sends `setintensity` with `intensity` and `seconds`, or `stop`. Configure your XToys Script to handle those actions. Use a private webhook ID; anyone who obtains it may be able to control the webhook.
 
-- Self Control can be paused in the menu; pausing sends a stop command.
-- `/xtoysstop` and the menu emergency stop send an immediate stop command.
-- The resource has not been runtime-tested against your server artifact or physical toy.
-- The game client can only send the stop command while the resource and NUI are running and connected. It cannot guarantee physical toy state if the game, browser UI, network, phone, webhook, or toy disconnects.
+## Local companion
+
+The separate [Windows Local Companion](../xtoys_self_control_companion/README.md) can run without a FiveM resource, but uses manual hotkeys and cannot automatically read gameplay events.
+
+## Safety and testing
+
+Start with low values and test while disconnected from other users. The stop command depends on the client, NUI, network and XToys service being available; it cannot guarantee a physical stop if any of those fail. This resource has not been runtime-tested against your particular server artifact or device.
