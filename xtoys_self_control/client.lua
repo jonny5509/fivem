@@ -4,6 +4,10 @@ local gameplayActive = false
 local lastEventAt = 0
 local lastVehicleSpeed = 0
 local wasFiring = false
+local fireStartedAt = 0
+local lastFirePulseAt = 0
+local burstStopAt = nil
+local fireBurst = false
 local wasMelee = false
 
 local function log(message)
@@ -120,15 +124,38 @@ CreateThread(function()
 
             if firing then
                 if not wasFiring then
+                    fireStartedAt = now
+                    fireBurst = false
+                    burstStopAt = nil
                     local duration = math.random(Config.SelfControl.ShotMinSeconds, Config.SelfControl.ShotMaxSeconds)
                     pulse(Config.SelfControl.ContinuousFireIntensity, duration)
+                    lastFirePulseAt = now
                 else
-                    pulse(Config.SelfControl.ContinuousFireIntensity, Config.SelfControl.ContinuousRefreshSeconds)
+                    -- Holding an automatic weapon beyond this window is treated as a burst.
+                    if now - fireStartedAt >= 350 then
+                        fireBurst = true
+                    end
+                    if fireBurst and now - lastFirePulseAt >= Config.SelfControl.ContinuousRefreshSeconds * 1000 then
+                        pulse(Config.SelfControl.ContinuousFireIntensity, Config.SelfControl.ContinuousRefreshSeconds)
+                        lastFirePulseAt = now
+                    end
                 end
-            elseif wasFiring then
-                stopToy()
+                wasFiring = true
+            else
+                if wasFiring then
+                    wasFiring = false
+                    if fireBurst then
+                        burstStopAt = now + 250
+                    end
+                end
+                -- A single shot is allowed to finish its configured random-duration pulse.
+                -- Sustained/automatic fire is explicitly stopped shortly after firing ends.
+                if fireBurst and burstStopAt and now >= burstStopAt then
+                    stopToy()
+                    fireBurst = false
+                    burstStopAt = nil
+                end
             end
-            wasFiring = firing
 
             if Config.SelfControl.EnableFalls
                 and (IsPedFalling(ped) or IsPedRagdoll(ped))
