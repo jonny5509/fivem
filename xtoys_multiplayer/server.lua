@@ -394,7 +394,13 @@ AddEventHandler('playerDropped', function()
 end)
 
 
+local function qiuiKvpKey(src)
+ local id=identifier(src)
+ return id and ('xtoys_qiui_enabled_' .. id) or nil
+end
 local function sendAdvancedState(src)
+ local key=qiuiKvpKey(src)
+ if qiuiEnabled[src]==nil and key and GetResourceKvpString(key)=='1' then qiuiEnabled[src]=true end
  TriggerClientEvent('xtoys:advancedState',src,{controlMode=controlModes[src] or 'self',qiuiEnabled=qiuiEnabled[src]==true,qiuiAvailable=Config.QIUI.AdapterResource~='' and GetResourceState(Config.QIUI.AdapterResource)=='started'})
 end
 RegisterNetEvent('xtoys:requestAdvancedState',function() sendAdvancedState(source) end)
@@ -427,6 +433,7 @@ RegisterNetEvent('xtoys:setQiuiEnabled',function(enabled)
   end
   qiuiEnabled[src]=true
  else qiuiEnabled[src]=nil; msg(src,'QIUI integration disabled. No QIUI commands will be sent.') end
+ local key=qiuiKvpKey(src); if key then SetResourceKvp(key,qiuiEnabled[src] and '1' or '0') end
  sendAdvancedState(src)
 end)
 RegisterNetEvent('xtoys:qiuiRequest',function(action)
