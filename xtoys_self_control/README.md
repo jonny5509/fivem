@@ -24,6 +24,9 @@ This project deliberately does not inject into or patch the FiveM process, bypas
 - `/xtoysconnect YOUR_PRIVATE_WEBHOOK_ID` — connect from chat.
 - `/xtoysdebug on|off|resume|status` — debug logging and trigger state.
 - The menu toggle can pause or resume gameplay feedback.
+- `/xtoyspartner SERVER_ID` — invite a nearby player to share events.
+- `/xtoyspartneraccept SERVER_ID` or `/xtoyspartnerdecline SERVER_ID` — accept or decline an invitation.
+- `/xtoyspartnerstop` — end the pairing.
 
 Key bindings can be changed in FiveM's Key Bindings settings.
 
@@ -38,6 +41,10 @@ Key bindings can be changed in FiveM's Key Bindings settings.
 
 Detection is best-effort and depends on FiveM/GTA event availability and the server/build. Some server-custom events or gameplay situations may not be exposed to this client resource. It is not guaranteed to detect every shot, hit, explosion, crash or fall.
 
+## Partner sharing
+
+Partner sharing is opt-in. One player invites another with their FiveM server ID; the recipient must accept. Paired players share gameplay pulses and bollard impacts only while they remain within the configured range (15 metres by default). Either player can end sharing with `/xtoyspartnerstop`. The server checks distance when relaying events and ends the pairing when players move out of range or disconnect. Both players need this resource running and gameplay triggers enabled to receive effects.
+
 ## xToys connection
 
 The NUI opens a WebSocket to `wss://webhook.xtoys.app/<webhookid>` and sends `setintensity` with `intensity` and `seconds`, or `stop`. Configure your xToys Script to handle those actions. Keep the webhook ID private: anyone who obtains it may be able to send commands to that webhook.
@@ -51,4 +58,4 @@ Edit `config.lua` to change intensities, durations, cooldowns, polling frequency
 - Test with low intensity first.
 - The emergency stop requires the client, NUI, network connection and xToys service to be functioning; it cannot guarantee a physical stop if one of those components fails.
 - This repository change has not been runtime-tested against your server artifact or xToys device.
-- No server-side pairing, trusted-partner role, QIUI adapter or multiplayer control is included.
+- Partner sharing and bollard relay have not been runtime-tested on your server; test with two consenting players at low intensity.
