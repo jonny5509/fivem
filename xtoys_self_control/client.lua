@@ -283,13 +283,17 @@ local bollardStates = {}
 local bollardIntensity = 0
 local lastBollardHitAt = 0
 local lastBollardPulseAt = 0
+local bollardFromPartner = false
 
-RegisterNetEvent('xtoys:selfControlBollardHit', function()
+RegisterNetEvent('xtoys:selfControlBollardHit', function(fromPartner)
     if not gameplayEnabled or not Config.Bollards.Enabled then return end
     bollardIntensity = math.min(Config.MaxIntensity,
         bollardIntensity + (Config.Bollards.IntensityStep or 10))
     lastBollardHitAt = GetGameTimer()
+    bollardFromPartner = fromPartner == true
+    receivingPartnerEvent = bollardFromPartner
     pulse(bollardIntensity, 2, 'bollard impact')
+    receivingPartnerEvent = false
     lastBollardPulseAt = lastBollardHitAt
 end)
 
@@ -345,7 +349,9 @@ CreateThread(function()
                 lastBollardHitAt = 0
                 stopToy()
             elseif now - lastBollardPulseAt >= 900 then
+                receivingPartnerEvent = bollardFromPartner
                 pulse(bollardIntensity, 2, 'bollard hold')
+                receivingPartnerEvent = false
                 lastBollardPulseAt = now
             end
         elseif not gameplayEnabled then
