@@ -110,9 +110,9 @@ RegisterNetEvent('xtoys:reportSelfControlBollardHit', function(x, y, z, modelHas
     local now = GetGameTimer()
     if recentHits[key] and now - recentHits[key] < 1500 then return end
     recentHits[key] = now
-    TriggerClientEvent('xtoys:selfControlBollardHit', src)
+    TriggerClientEvent('xtoys:selfControlBollardHit', src, false)
     local partner = closePartners(src)
-    if partner then TriggerClientEvent('xtoys:selfControlBollardHit', partner) end
+    if partner then TriggerClientEvent('xtoys:selfControlBollardHit', partner, true) end
     for hitKey, hitTime in pairs(recentHits) do
         if now - hitTime > 10000 then recentHits[hitKey] = nil end
     end
