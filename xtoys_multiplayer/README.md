@@ -70,5 +70,17 @@ This resource has not been runtime-tested against your server's artifact build o
 - Required future behaviour: no countdown, no scheduled release, and no automatic unlock on disconnect or restart. Unlock only after an explicit authenticated owner or authorised Special Partner action.
 - No physical QIUI lock state is currently controlled or persisted by this resource. The QIUI UI is a guarded placeholder, not a working device integration.
 
-## Special Partner status
-The exclusive Special Partner role, transfer offers, acceptance/owner confirmation, and 72-hour offline expiry workflow are not implemented in this commit. These require the role lifecycle to be completed alongside the model-specific QIUI adapter so ordinary trusted partners cannot gain device permissions.
+## Special Partner
+- One exclusive Special Partner per owner, chosen from already trusted partners.
+- Owner sends offer; recipient accepts or declines; an accepted offer only takes effect after the owner confirms it.
+- Offer expiry is configurable (48 hours by default). Declines and expiry leave the existing assignment unchanged.
+- If the assigned partner is offline for 72 consecutive hours, their role expires and control returns to the owner. The owner is notified and may offer the role to someone else or leave it disabled.
+- Owner can revoke the role at any time. Ordinary trusted partners do not gain Special Partner status.
+- This role workflow is permission bookkeeping only. It does not yet send Cellmate 2 lock/unlock commands.
+
+
+## QIUI Cellmate 2 hardware boundary
+- The Cellmate 2 setup guide documents control through the QIUI app and describes locking on app disconnection. No official public developer API/SDK or protocol was located for direct FiveM control.
+- The resource therefore does not attempt reverse-engineered BLE/cloud commands. QIUI stays disabled by default; the current panel is a guarded placeholder and does not operate the physical lock.
+- A future adapter needs a documented/authorised interface, device-state confirmation, authenticated owner/Special Partner checks, and an independently tested emergency-release path. Do not use indefinite lock behaviour without a reliable physical way to remove the device if the electronics, app, phone, battery, or server fail.
+- There is no automatic unlock timer implemented, but this resource also cannot guarantee a physical locked state or enforce the lock policy without that verified adapter.
