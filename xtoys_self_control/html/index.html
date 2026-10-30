@@ -10,7 +10,7 @@
 <main id="app" class="hidden">
     <section class="panel">
         <header>
-            <div><small>CLIENT-ONLY FIVEM RESOURCE</small><h1>xToys <span>Self Control</span></h1></div>
+            <div><small>FIVEM CLIENT RESOURCE</small><h1>xToys <span>Self Control</span></h1></div>
             <button id="close" class="close" aria-label="Close">×</button>
         </header>
         <div id="toast" class="toast hidden"></div>
@@ -24,22 +24,22 @@
                 <button id="connect" class="primary">Connect</button>
                 <button id="disconnect" class="secondary">Disconnect</button>
             </div>
-            <p class="hint">Your webhook ID stays in this local NUI session and is never sent to the server.</p>
+            <p class="hint">The webhook ID is held in this local NUI session. Keep it private.</p>
         </section>
         <section class="card">
             <h2>SELF CONTROL</h2>
-            <p class="hint">Only your own gameplay events can trigger your connected toy. There is no pairing, partner control, or server-side multiplayer logic in this resource.</p>
+            <p class="hint">Feedback is based on your own locally detected gameplay events. No pairing or partner-control features are included.</p>
             <div class="line"><i id="modeDot" class="online"></i><b id="modeStatus">Self Control enabled</b></div>
             <label class="toggle"><input id="enabled" type="checkbox" checked> Enable gameplay feedback</label>
-            <p class="hint">Shooting, damage, explosions, vehicle impacts, falls/ragdolls and melee can trigger feedback. Automatic fire refreshes while firing and stops when you stop shooting.</p>
+            <p class="hint">Detects shooting, local-player damage, explosions, vehicle impacts, falls/ragdolls and melee where exposed by your FiveM/GTA build. Detection is best-effort.</p>
         </section>
         <section class="safety">
             <b>Emergency stop</b>
-            <p>Use this at any time to send an immediate stop command.</p>
+            <p>Stops feedback and pauses all gameplay triggers.</p>
             <div class="buttons"><button id="stop" class="danger wide">EMERGENCY STOP</button></div>
-            <small>Also available with /xtoysstop</small>
+            <small>Keyboard: F8 · Command: /xtoysstop</small>
         </section>
-        <footer>Commands: /xtoys · /xtoysconnect YOUR_WEBHOOK_ID · /xtoysstop</footer>
+        <footer>Open: F7 or /xtoys · Connect: /xtoysconnect YOUR_WEBHOOK_ID</footer>
     </section>
 </main>
 <script src="app.js"></script>
